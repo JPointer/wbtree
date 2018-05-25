@@ -44,12 +44,12 @@ private[wbtree] sealed abstract class WBTree[+A: MyOrdering] {
   def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = Node(valueAdded, WBTreeNil, WBTreeNil)
   def exists[T >: A : MyOrdering](value: T): Boolean = false
   def remove[T >: A : MyOrdering](valueRemoved: T): WBTree[T] = throw new NoSuchElementException(String.valueOf(valueRemoved))
-  protected def rebalance[T >: A : MyOrdering]: WBTree[T] = this
-  protected def remove_and_get_min[T >: A : MyOrdering]: (T, WBTree[T]) = throw new IllegalStateException()
-  protected def singleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
-  protected def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
-  protected def singleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
-  protected def doubleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def rebalance[T >: A : MyOrdering]: WBTree[T] = this
+  def remove_and_get_min[T >: A : MyOrdering]: (T, WBTree[T]) = throw new IllegalStateException()
+  def singleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def singleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def doubleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
 }
 
 private case object WBTreeNil extends WBTree[Nothing] {

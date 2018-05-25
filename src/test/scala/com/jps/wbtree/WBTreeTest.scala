@@ -19,7 +19,7 @@ class WBTreeTest extends org.scalatest.FunSuite {
     val wbtree: WBTree[Int] = WBTreeNil
     val tre = populateTreeRandom(500)
     val r = scala.util.Random
-    for (x <- wbtree.iterator) {
+    for (x <- tre.iterator) {
       println(x)
     }
 //
