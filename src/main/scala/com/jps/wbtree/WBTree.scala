@@ -1,6 +1,13 @@
 package com.jps.wbtree
 
+import com.jps.wbtree.DataOrdering.MyOrdering
+
 object DataOrdering {
+  trait MyOrdering[T] {
+    def lt(a: T, b: T): Boolean
+    def eq(a: T, b: T): Boolean
+    def gt(a: T, b: T): Boolean
+  }
   implicit object DoubleOrdering extends MyOrdering[Double] {
     override def eq(a: Double, b: Double): Boolean = a == b
     override def lt(a: Double, b: Double): Boolean = a < b
@@ -16,84 +23,113 @@ object DataOrdering {
     override def lt(a: String, b: String): Boolean = a.compareTo(b) < 0
     override def gt(a: String, b: String): Boolean = a.compareTo(b) > 0
   }
+  implicit object NothingOrdering extends MyOrdering[Nothing] {
+    override def eq(a: Nothing, b: Nothing): Boolean = false
+    override def lt(a: Nothing, b: Nothing): Boolean = false
+    override def gt(a: Nothing, b: Nothing): Boolean = false
+  }
 }
 
-class WBTree[T: MyOrdering] {
+private[wbtree] sealed abstract class WBTree[+A: MyOrdering] {
+  def weight: Int
+  def iterator[T >: A : MyOrdering]: Iterator[T] = Iterator.empty
+  def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = Node(valueAdded, WBTreeNil, WBTreeNil)
+  def exists[T >: A : MyOrdering](value: T): Boolean = false
+  def rebalance[T >: A : MyOrdering]: WBTree[T] = this
+  def singleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def singleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+  def doubleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
+}
 
-  private var root: Option[Node] = None
+private case object WBTreeNil extends WBTree[Nothing] {
+  def weight = 0
+}
 
-  class Node(value: T, var weight: Int, var parent: Option[Node] = None,
-             var left: Option[Node] = None, var right: Option[Node] = None) {
+private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[A]) extends WBTree[A] {
 
-    def add(valueAdded: T): Unit = {
+  val delta: Double = 1 + Math.sqrt(2)
+  val gamma: Double = Math.sqrt(2)
+
+  override val weight: Int = left.weight + right.weight + 1
+
+    override def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = {
       val comparator = implicitly[MyOrdering[T]]
 
-      incrementWeight
-      if(comparator.lt(valueAdded, value))
-        left match {
-          case None => left = Some(new Node(valueAdded, 1, Some(this)))
-          case Some(leftChild) => leftChild.add(valueAdded)
-        }
+      if (comparator.lt(valueAdded, value))
+        Node[T](value, left.add(valueAdded), right).rebalance
       else
-        right match {
-          case None => right = Some(new Node(valueAdded, 1, Some(this)))
-          case Some(rightChild) => rightChild.add(valueAdded)
-        }
+        Node(value, left, right.add(valueAdded)).rebalance
     }
-    def remove(valueRemoved: T): Unit = {
+
+    def remove[T >: A : MyOrdering](valueRemoved: T): WBTree[T] = {
       val comparator = implicitly[MyOrdering[T]]
 
-      decrementWeight
+      //decrementWeight
       //TODO
-
+      this
     }
-    def exists(valueExist: T): Boolean = {
-      val comparator = implicitly[MyOrdering[T]]
-
-      if(comparator.eq(valueExist, value))
-        true
-      else if(comparator.lt(valueExist, value))
+    override def rebalance[T >: A : MyOrdering]: WBTree[T] = {
+      if (left.weight + right.weight < 2)
+        this
+      else if (right.weight > delta * left.weight)
+        right match {
+          case Node(_, rightLeft, rightRight) =>
+            if (rightLeft.weight < rightRight.weight * gamma)
+              singleLeftRotate
+            else
+              doubleLeftRotate
+          case _ => throw new IllegalStateException()
+        }
+      else if (left.weight > delta * right.weight)
         left match {
-          case None => false
-          case Some(leftChild) => leftChild.exists(valueExist)
+          case Node(_, leftLeft, leftRight) =>
+            if (leftRight.weight < leftLeft.weight * gamma)
+              singleRightRotate
+            else
+              doubleRightRotate
+          case _ => throw new IllegalStateException()
         }
       else
-        right match {
-          case None => false
-          case Some(rightChild) => rightChild.exists(valueExist)
-        }
-
+        this
     }
-    def incrementWeight(): Unit = {
-      weight = weight + 1
-    }
-    def decrementWeight(): Unit = {
-      weight = weight - 1
-    }
-  }
-
-  def add(valueAdded: T): Unit = {
-    if(!exists(valueAdded))
-      root match {
-        case None => {
-          root = Some(new Node(valueAdded, 1))
-        }
-        case Some(rootNode) => {
-          rootNode.add(valueAdded)
-        }
+    override def singleLeftRotate[T >: A : MyOrdering]: Node[T] = {
+      this match {
+        case Node(curVal, curLeft, Node(curRightVal, curRightLeft, curRightRight))
+          => Node(curRightVal, Node(curVal, curLeft, curRightLeft), curRightRight)
+        case _ => throw new IllegalStateException()
       }
-
-  }
-  def remove(valueRemoved: T): Unit = {
-    if(exists(valueRemoved))
-      root.get.remove(valueRemoved)
-
-  }
-  def exists(valueExist: T): Boolean = {
-    root match {
-      case None => false
-      case Some(rootNode) => rootNode.exists(valueExist)
     }
-  }
+    override def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = {
+      this match {
+        case Node(curVal, curLeft, Node(rightVal, Node(rightLeftVal, rightLeftLeft, rightLeftRight), rightRight))
+          => Node[T](rightLeftVal, Node(curVal, curLeft, rightLeftLeft), Node(rightVal, rightLeftRight, rightRight))
+        case _ => throw new IllegalStateException()
+      }
+    }
+    override def singleRightRotate[T >: A : MyOrdering]: Node[T] = {
+      this match {
+        case Node(curVal, Node(curLeftVal, curLeftLeft, curLeftRight), curRight)
+        => Node(curLeftVal, curLeftLeft, Node(curVal, curLeftRight, curRight))
+        case _ => throw new IllegalStateException()
+      }
+    }
+    override def doubleRightRotate[T >: A : MyOrdering]: Node[T] = {
+      this match {
+        case Node(curVal, Node(leftVal, leftLeft, Node(leftRightVal, leftRightLeft, leftRightRight)), curRight)
+          => Node(leftRightVal, Node(leftVal, leftLeft, leftRightLeft), Node(curVal, leftRightRight, curRight))
+        case _ => throw new IllegalStateException()
+      }
+    }
+    override def exists[T >: A : MyOrdering](valueExist: T): Boolean = {
+      val comparator = implicitly[MyOrdering[T]]
+
+      if (comparator.eq(valueExist, value))
+        true
+      else if (comparator.lt(valueExist, value))
+        left.exists(valueExist)
+      else
+        right.exists(valueExist)
+    }
 
 }
