@@ -17,10 +17,22 @@ class WBTreeTest extends org.scalatest.FunSuite {
   }
   test("Adding test") {
     val wbtree: WBTree[Int] = WBTreeNil
-    val tre = populateTreeRandom(500000)
+    val tre = populateTreeRandom(500)
     val r = scala.util.Random
-
-    wbtree.add(1).add(2).add(3).add(-2)
+    for (x <- wbtree.iterator) {
+      println(x)
+    }
+//
+//    val test = wbtree.add(1).add(2).add(33).add(-2).remove(-2)
+//    val test2 = test
+//      .add(2)
+//      .add(5)
+//      .add(4)
+//      .add(2)
+//      .remove(33)
+//      .add(2)
+//      .add(43)
+//    val test3 = test2
   }
 
 
