@@ -3,7 +3,7 @@ package com.jps.wbtree
 import com.jps.wbtree.DataOrdering.MyOrdering
 
 import scala.annotation.tailrec
-import scala.collection.{immutable, mutable}
+import scala.collection.{mutable}
 
 object DataOrdering {
   trait MyOrdering[T] {
