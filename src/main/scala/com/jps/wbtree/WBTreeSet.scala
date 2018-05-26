@@ -2,6 +2,7 @@ package com.jps.wbtree
 
 import com.jps.wbtree.DataOrdering.MyOrdering
 
+import scala.annotation.tailrec
 import scala.collection.{immutable, mutable}
 
 object DataOrdering {
@@ -32,37 +33,33 @@ object DataOrdering {
   }
 }
 
-class Set[A: MyOrdering] extends WBTree[A] {
-  override def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = super.add(valueAdded)
-  override def exists[T >: A : MyOrdering](value: T): Boolean = super.exists(value)
-  override def remove[T >: A : MyOrdering](valueRemoved: T): WBTree[T] = super.remove(valueRemoved)
-}
-
-private[wbtree] sealed abstract class WBTree[+A: MyOrdering] {
-  def weight: Int = 0
+sealed abstract class WBTreeSet[+A: MyOrdering] {
+  def size: Int = 0
   def iterator[T >: A : MyOrdering]: Iterator[T] = Iterator.empty
-  def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = Node(valueAdded, WBTreeNil, WBTreeNil)
+  def add[T >: A : MyOrdering](valueAdded: T): WBTreeSet[T] = Node(valueAdded, WBTreeSetNil, WBTreeSetNil)
   def exists[T >: A : MyOrdering](value: T): Boolean = false
-  def remove[T >: A : MyOrdering](valueRemoved: T): WBTree[T] = throw new NoSuchElementException(String.valueOf(valueRemoved))
-  def rebalance[T >: A : MyOrdering]: WBTree[T] = this
-  def remove_and_get_min[T >: A : MyOrdering]: (T, WBTree[T]) = throw new IllegalStateException()
+  def intersect[T >: A : MyOrdering](other: WBTreeSet[T]): WBTreeSet[T] = WBTreeSetNil
+  def sum[T >: A : MyOrdering](other: WBTreeSet[T]): WBTreeSet[T] = other
+  def remove[T >: A : MyOrdering](valueRemoved: T): WBTreeSet[T] = throw new NoSuchElementException(String.valueOf(valueRemoved))
+  def rebalance[T >: A : MyOrdering]: WBTreeSet[T] = this
+  def remove_and_get_min[T >: A : MyOrdering]: (T, WBTreeSet[T]) = throw new IllegalStateException()
   def singleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
   def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
   def singleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
   def doubleRightRotate[T >: A : MyOrdering]: Node[T] = throw new IllegalStateException()
 }
 
-private case object WBTreeNil extends WBTree[Nothing] {
+case object WBTreeSetNil extends WBTreeSet[Nothing] {
 }
 
-private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[A]) extends WBTree[A] {
+case class Node[A: MyOrdering](value: A, left: WBTreeSet[A], right: WBTreeSet[A]) extends WBTreeSet[A] {
 
   val delta: Double = 1 + Math.sqrt(2)
   val gamma: Double = Math.sqrt(2)
 
-  override val weight: Int = left.weight + right.weight + 1
+  override val size: Int = left.size + right.size + 1
 
-  override def add[T >: A : MyOrdering](valueAdded: T): WBTree[T] = {
+  override def add[T >: A : MyOrdering](valueAdded: T): WBTreeSet[T] = {
     val comparator = implicitly[MyOrdering[T]]
 
     if (comparator.lt(valueAdded, value))
@@ -74,22 +71,22 @@ private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[
       this
   }
 
-  override def rebalance[T >: A : MyOrdering]: WBTree[T] = {
-    if (left.weight + right.weight < 2)
+  override def rebalance[T >: A : MyOrdering]: WBTreeSet[T] = {
+    if (left.size + right.size < 2)
       this
-    else if (right.weight > delta * left.weight)
+    else if (right.size > delta * left.size)
       right match {
         case Node(_, rightLeft, rightRight) =>
-          if (rightLeft.weight < rightRight.weight * gamma)
+          if (rightLeft.size + 1 < (rightRight.size + 1) * gamma)
             singleLeftRotate
           else
             doubleLeftRotate
         case _ => throw new IllegalStateException()
       }
-    else if (left.weight > delta * right.weight)
+    else if (left.size > delta * right.size)
       left match {
         case Node(_, leftLeft, leftRight) =>
-          if (leftRight.weight < leftLeft.weight * gamma)
+          if (leftRight.size + 1 < (leftLeft.size + 1) * gamma)
             singleRightRotate
           else
             doubleRightRotate
@@ -102,7 +99,7 @@ private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[
     this match {
       case Node(curVal, curLeft, Node(curRightVal, curRightLeft, curRightRight))
         => Node(curRightVal, Node(curVal, curLeft, curRightLeft), curRightRight)
-    }
+        }
   }
   override def doubleLeftRotate[T >: A : MyOrdering]: Node[T] = {
     this match {
@@ -137,23 +134,23 @@ private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[
   * @param valueToRemove wartośc do usunięcia
   * @return Aktualny węzeł (drzewo) po usunięciu wartości
   */
-  override def remove[T >: A : MyOrdering](valueToRemove: T): WBTree[T] = {
+  override def remove[T >: A : MyOrdering](valueToRemove: T): WBTreeSet[T] = {
     val comparator = implicitly[MyOrdering[T]]
 
     if (comparator.eq(valueToRemove, value)) {
       // Należy usunąć aktualny węzeł
       left match {
-        case WBTreeNil =>
+        case WBTreeSetNil =>
           right match {
             // Węzeł na samym dole drzewa, najprostszy przypadek, zwracamy pusty węzeł
-            case WBTreeNil => WBTreeNil
+            case WBTreeSetNil => WBTreeSetNil
             // Istnieje tylko prawy węzeł-dziecko - zastąpi on aktualnie usuwany węzeł
             case _ => right.rebalance
           }
         case Node(leftVal, leftLeft, leftRight) => {
           right match {
             // istnieje tylko lewy węzeł-dziecko - zastępuje aktualnie usuwany węzeł
-            case WBTreeNil => left.rebalance
+            case WBTreeSetNil => left.rebalance
             // istnieje zarówno lewe jak i prawe dziecko - znajdujemy najmniejszy większy element od aktualnego i podmieniamy
             case _ => {
               val (smallestHigher, newRight) = right.remove_and_get_min
@@ -168,14 +165,48 @@ private case class Node[A: MyOrdering](value: A, left: WBTree[A], right: WBTree[
     else
       Node(value, left, right.remove(valueToRemove)).rebalance
   }
-  override def remove_and_get_min[T >: A : MyOrdering]:  (T, WBTree[T]) = {
+  override def remove_and_get_min[T >: A : MyOrdering]:  (T, WBTreeSet[T]) = {
     left match {
-      case WBTreeNil => (value, right)
+      case WBTreeSetNil => (value, right)
       case _ => {
         val (min, newLeft) = left.remove_and_get_min
         (min, Node(value, newLeft, right).rebalance)
       }
     }
+  }
+
+  override def intersect[T >: A : MyOrdering](other: WBTreeSet[T]): WBTreeSet[T] = {
+    val comparator = implicitly[MyOrdering[T]]
+
+    val thisIterator = this.iterator
+    val otherIterator = other.iterator
+    @tailrec
+    def inner(set: WBTreeSet[T], curThisIterVal: T, curOtherIterVal: T) : WBTreeSet[T] = {
+      if(comparator.eq(curThisIterVal, curOtherIterVal))
+        if (thisIterator.hasNext && otherIterator.hasNext)
+          inner(set.add(curThisIterVal), thisIterator.next(), otherIterator.next())
+        else
+          set.add(curThisIterVal)
+      else if (comparator.lt(curThisIterVal: T, curOtherIterVal: T))
+        if (thisIterator.hasNext) inner(set, thisIterator.next(), curOtherIterVal) else set
+      else
+      if (otherIterator.hasNext) inner(set, curThisIterVal, otherIterator.next()) else set
+    }
+    if (!thisIterator.hasNext || !otherIterator.hasNext)
+      WBTreeSetNil
+    else
+      inner(WBTreeSetNil, thisIterator.next(), otherIterator.next())
+  }
+  override def sum[T >: A : MyOrdering](other: WBTreeSet[T]): WBTreeSet[T] = {
+    val otherIterator = other.iterator
+    @tailrec
+    def inner(set: WBTreeSet[T]) : WBTreeSet[T] = {
+      if (otherIterator.hasNext)
+        inner(set.add(otherIterator.next))
+      else
+        set
+    }
+    inner(this)
   }
 
   override def iterator[T >: A : MyOrdering]: Iterator[T] = new WBTreeIterator(this)
@@ -187,9 +218,9 @@ private class WBTreeIterator[T](node: Node[T]) extends Iterator[T] {
   val stack = mutable.ArrayStack[Node[T]]()
   goFarLeft(node)
 
-  def goFarLeft(curNode: WBTree[T]): Unit = {
+  def goFarLeft(curNode: WBTreeSet[T]): Unit = {
     curNode match {
-      case WBTreeNil => Unit
+      case WBTreeSetNil => Unit
       case node : Node[T] => {
         stack.push(node)
         goFarLeft(node.left)
