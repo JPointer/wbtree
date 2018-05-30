@@ -113,16 +113,16 @@ sealed abstract class WBTreeSet[+A: MyOrdering] {
   def remove[T >: A : MyOrdering](valueRemoved: T): WBTreeSet[T] = throw new NoSuchElementException(String.valueOf(valueRemoved))
 
   /**
-    * Reabalance WBTreeSet.
+    * Rebalance WBTreeSet.
     * @tparam T type of a inserted value
     * @return rebalanced WBTreeSet
     */
   def rebalance[T >: A : MyOrdering]: WBTreeSet[T] = this
 
   /**
-    *
+    * Go right once and then always left, remove this founded node.
     * @tparam T type of data stored in WBTreeSet
-    * @return
+    * @return WBTreeSet without removed node
     */
   def remove_and_get_min[T >: A : MyOrdering]: (T, WBTreeSet[T]) = throw new IllegalStateException()
 
